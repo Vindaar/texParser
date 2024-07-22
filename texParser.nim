@@ -207,5 +207,51 @@ proc parse*(tokens: var seq[Token]): seq[TexNode] =
     result.add t.parseToken(tokens)
 
 proc parseTex*(s: string): seq[TexNode] =
+  ## Given a string of a `LaTeX` document, return the result parsed into `TexNodes`.
   var toks = tokenize(s).reversed
   result = parse(toks)
+
+
+
+##############################
+###### Some utilities ########
+##############################
+
+proc getDocument*(doc: seq[TexNode]): (seq[TexNode], TexNode) =
+  ## Returns the preamble `result[0]` and the actual `document` environment
+  for el in doc:
+    case el.kind
+    of txEnvironment:
+      if el.envName == "document":
+        result[1] = el
+        return
+      else:
+        result[0].add el
+    else:
+      result[0].add el
+
+proc splitBySections*(tex: seq[TexNode], yieldHeader: bool): seq[seq[TexNode]] =
+  ## Split the given document by individual sections and returns each
+  ## separately as a single `seq` to iterate over.
+  ##
+  ## If `yieldHeader` is `true`, also yields the header before `\begin{document}`
+  let (header, doc) = getDocument(tex)
+  if not doc.isNil:
+    if yieldHeader:
+      result.add header
+    var current: seq[TexNode]
+    for el in doc.content:
+      if el.kind == txCommand and el.name.endsWith("section"):
+        result.add current
+        current.setLen(0)
+      current.add el
+    result.add current
+  else:
+    result.add header # we only include the header if there is no `document`
+
+iterator sections*(doc: seq[TexNode], yieldHeader = false): string =
+  ## Yields (stringified & flattened) individual environments. Can be used by the caller
+  ## to perform operations on the linear document.
+  let ss = doc.splitBySections(yieldHeader)
+  for s in ss:
+    yield $s
