@@ -64,6 +64,8 @@ P_{c↦γ} = \left( \frac{β_γ B L}{2 m_{\text{pl}}} \right)².
 import texParser
 let t = parseTex(tex)
 echo typeof(t) #
+# seq[TexNode]
+
 
 proc getCommand(t: seq[TexNode], cmd: string): seq[TexNode] =
   for n in t:
@@ -75,7 +77,9 @@ proc getCommand(t: seq[TexNode], cmd: string): seq[TexNode] =
     else:
       discard
 echo getCommand(t, "section")
+# \section{Chameleons}
 echo getCommand(t, "cite")
+# \cite{waterhouse2006chameleons}\cite{brax15_distinguish}
 #+end_src
 
 #+RESULTS:
