@@ -1,0 +1,90 @@
+* texParser - A basic LaTeX parser
+
+This library provides a (very basic) LaTeX parser, somewhat similar to
+the stdlib ~xmlparser~.
+
+I needed to do some programmatic work on a LaTeX document, so I ended
+up with this, because I didn't want to rely on ~find~.
+
+Everything is parsed into a (seq of) ~TexNode~.
+
+#+begin_src nim
+  TexNodeKind* = enum
+    txText, txCommand, txOption, txOptList, txArgument, txArgList, txEnvironment, txEnvironmentEnd
+
+  TexObj* = object
+    case kind*: TexNodeKind
+    of txText:
+      text*: string
+    of txCommand:
+      name*: string
+      arguments*: TexNode # `txArgList`
+      optionalArguments*: TexNode # `txOptList`
+    of txArgument:
+      arg*: seq[TexNode] # can be anything
+    of txArgList:
+      args*: seq[TexNode] # all `txArgument`
+    of txOption:
+      opt*: seq[TexNode] # can be anything
+    of txOptList:
+      opts*: seq[TexNode] # all `txOption`
+    of txEnvironment:
+      envName*: string
+      optArgs*: TexNode # txOption
+      content*: seq[TexNode]
+    of txEnvironmentEnd: ## only for saner parsing, won't appear in final `seq[TexNode]` "AST"
+      envNameEnd*: string
+  TexNode* = ref TexObj
+#+end_src
+
+** Example
+
+#+begin_src nim :results drawer
+const tex = """
+\begin{document}
+\section{Chameleons}
+\label{sec:theory:chameleon}
+Chameleons are a different type of hypothetical particle. A scalar
+particle arising from extensions to general relativity, which acts as
+a "fifth force" and can be used to model dark energy. We will not go
+into detail about the underlying theory here. Refer to
+\cite{waterhouse2006chameleons} for an in-depth introduction to
+chameleon gravity and \cite{brax15_distinguish} on how they differ from
+other modified gravity models.
+
+% ...
+
+\begin{equation}
+\label{eq:theory:chameleon_conversion_prob}
+P_{c↦γ} = \left( \frac{β_γ B L}{2 m_{\text{pl}}} \right)².
+\end{equation}
+\end{document}
+"""
+
+import texParser
+let t = parseTex(tex)
+echo typeof(t) #
+
+proc getCommand(t: seq[TexNode], cmd: string): seq[TexNode] =
+  for n in t:
+    case n.kind
+    of txEnvironment:
+      result.add getCommand(n.content, cmd)
+    of txCommand:
+      if n.name == cmd: result.add n
+    else:
+      discard
+echo getCommand(t, "section")
+echo getCommand(t, "cite")
+#+end_src
+
+#+RESULTS:
+:results:
+seq[TexNode]
+\section{Chameleons}
+\cite{waterhouse2006chameleons}\cite{brax15_distinguish}
+:end:
+
+*Note*: The default string converter ~$~ calls ~stringify~, which is
+the function to convert a ~TexNode~ back into valid LaTeX. Use ~repr~
+if you want to see the node information.
